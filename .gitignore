@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+models/
+data/Phishing_Email.csv
+*.pyc
+.DS_Store
+.env
