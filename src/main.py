@@ -6,6 +6,15 @@ try:
 except ImportError:
     MLPhishingDetector = None
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from rich.table import Table
+from rich import print as rprint
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+console = Console()
+
 def detect_obfuscation(email_content):
     score = 0
     findings = []
@@ -14,46 +23,41 @@ def detect_obfuscation(email_content):
     found_chars = [char for char in invisible_chars if char in email_content]
     if found_chars:
         score += 30
-        findings.append("🚩 Obfuscation detected: Invisible characters (e.g., zero-width spaces) found in the email body.")
-        
+        findings.append("[bold red]?? Obfuscation:[/bold red] Invisible characters (e.g., zero-width spaces) found.")
+
     return score, findings
 
 def analyze_urls(email_content):
     score = 0
     findings = []
-    
+
     # Extract URLs
     urls = re.findall(r'https?://[^\s<>"]+|www\.[^\s<>"]+', email_content)
-    
+
     if not urls:
         return score, findings
-        
+
     for url in urls:
         try:
             parsed = urlparse(url if url.startswith('http') else f"http://{url}")
             domain = parsed.netloc.lower()
-            
-            # 1. Suspicious IP Addresses (already mostly handled, but good to have in URL logic)
+
+            # 1. Suspicious IP Addresses
             if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', domain):
                 score += 40
-                findings.append(f"🚩 Suspicious URL: Uses an IP address instead of a domain name ({url}).")
-                
+                findings.append(f"[bold red]?? Suspicious URL:[/bold red] Uses IP instead of domain ([cyan]{url}[/cyan]).")
+            
             # 2. URL Shorteners
             shorteners = ['bit.ly', 'goo.gl', 't.co', 'tinyurl.com', 'is.gd', 'cli.gs', 'shorte.st']
             if any(shortener in domain for shortener in shorteners):
                 score += 25
-                findings.append(f"🚩 Obfuscated URL: Uses a URL shortener service ({domain}).")
-                
-            # 3. Homograph Attack (Cyrillic mixing)
-            if re.search(r'[а-яА-Я]', domain):
-                score += 50
-                findings.append(f"🚩 CRITICAL: Homograph attack detected in URL ({domain}). Mixing scripts to spoof legitimate domains.")
-                
-            # 4. Deep Subdomains (e.g., login.microsoft.security.update.com)
+                findings.append(f"[bold yellow]?? Obfuscated URL:[/bold yellow] Uses shortener service ([cyan]{domain}[/cyan]).")
+            
+            # 3. Deep Subdomains
             if domain.count('.') > 3:
                 score += 15
-                findings.append(f"🚩 Suspicious URL: Unusually high number of subdomains ({domain}).")
-                
+                findings.append(f"[bold yellow]?? Suspicious URL:[/bold yellow] High number of subdomains ([cyan]{domain}[/cyan]).")
+
         except Exception:
             pass
 
@@ -68,8 +72,8 @@ def simple_scanner(email_content):
     for word in keywords:
         if word in email_content.lower():
             score += 15
-            findings.append(f"🚩 High-pressure/social engineering keyword detected: '{word}'")
-
+            findings.append(f"[bold yellow]?? Social Engineering:[/bold yellow] Threat keyword detected: '{word}'")
+            
     # 2. Advanced Obfuscation Checks
     obf_score, obf_findings = detect_obfuscation(email_content)
     score += obf_score
@@ -83,74 +87,81 @@ def simple_scanner(email_content):
     # 4. Check for typical phishing "Sense of Urgency"
     if "24 hours" in email_content or "limited time" in email_content:
         score += 20
-        findings.append("🚩 Time-sensitive threat detected.")
+        findings.append("[bold red]?? Urgency:[/bold red] Time-sensitive threat detected.")
 
     return score, findings
 
 def run_project():
-    print("--- 🛡️ PhishGuard Pro Email Scanner 🛡️ ---")
-    
+    console.print(Panel(Text("??? PhishGuard Enterprise: Command Line Interface ???", justify="center", style="bold cyan"), border_style="cyan"))
+
     # Path to your test data
     data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'sample_mail.txt')
     
     if not os.path.exists(data_path):
-        print(f"Error: Please create the file {data_path} first.")
+        console.print(f"[bold red]Error:[/bold red] Please create the file {data_path} first.")
         return
 
     with open(data_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Rule-Based Analysis
-    print("\n[+] Running Rule-Based Heuristics Check...")
-    score, findings = simple_scanner(content)
-    
-    # Machine Learning Analysis
+    score = 0
+    findings = []
     ml_verdict = "N/A"
-    ml_probability = 0.0
-    if MLPhishingDetector:
-        print("\n[+] Running Machine Learning Semantic Analysis...")
-        ml_detector = MLPhishingDetector()
-        
-        if ml_detector.model_loaded:
-            try:
-                # We utilize the extract and predict methodology exported by ml_detector
-                prediction, ml_prob, _ = ml_detector.predict(content)
-                
-                if prediction == 1:
-                    ml_verdict = f"PHISHING (Confidence: {ml_prob*100:.2f}%)"
-                    score += 50  # Boost overall score if ML detects it
-                    findings.append(f"🤖 ML Engine Flagged Content as Malicious (Conf: {ml_prob*100:.2f}%)")
-                elif prediction == 0:
-                    ml_verdict = f"BENIGN (Confidence: {ml_prob*100:.2f}%)"
-            except Exception as e:
-                findings.append(f"🤖 ML Engine encountered error: {e}")
+    ml_prob = 0.0
 
-    print(f"\nScanning content from: {data_path}")
-    print("-" * 50)
+    with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+        progress.add_task(description="Running Heuristics Engine...", total=None)
+        score, findings = simple_scanner(content)
+
+    if MLPhishingDetector:
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
+            progress.add_task(description="Loading ML Models...", total=None)
+            ml_detector = MLPhishingDetector()
+            
+            if ml_detector.model_loaded:
+                try:
+                    prediction, ml_prob, _ = ml_detector.predict(content)
+                    if prediction == 1:
+                        ml_verdict = "[bold red]MALICIOUS PAYLOAD[/bold red]"
+                        score += 50  
+                        findings.append(f"[bold red]?? ML Engine:[/bold red] Content matches threat signatures (Conf: {ml_prob*100:.1f}%)")
+                    elif prediction == 0:
+                        ml_verdict = "[bold green]BENIGN COMMUNICATION[/bold green]"
+                except Exception as e:
+                    findings.append(f"[dim red]?? ML Engine Error:[/dim red] {e}")
+
+    # Output Findings Table
+    console.print(f"\n[bold blue]Scanning payload from:[/bold blue] [dim]{data_path}[/dim]")
+    
+    table = Table(show_header=True, header_style="bold magenta", border_style="magenta")
+    table.add_column("Threat Indicator", style="dim")
     
     if findings:
         for finding in findings:
-            print(finding)
+            table.add_row(finding)
     else:
-        print("✅ No suspicious indicators found in the scan.")
+        table.add_row("[bold green]? No suspicious indicators found in the scan.[/bold green]")
         
-    print("-" * 50)
-    
-    # Final Risk Assessment
+    console.print(table)
+
+    # Final Risk Assessment Panel
+    verdict_text = ""
+    verdict_color = ""
     if score >= 50:
-        print(f"FINAL VERDICT: ⚠️ HIGH RISK (Rule Score: {score})")
+        verdict_text = f"CRITICAL RISK (Score: {score})"
+        verdict_color = "red"
     elif score >= 20:
-        print(f"FINAL VERDICT: ⚠️ MEDIUM RISK (Rule Score: {score})")
+        verdict_text = f"MEDIUM RISK (Score: {score})"
+        verdict_color = "yellow"
     else:
-        print(f"FINAL VERDICT: ✅ LOW RISK (Rule Score: {score})")
-    
-    print(f"ML ENGINE VERDICT: {ml_verdict}")
+        verdict_text = f"LOW RISK (Score: {score})"
+        verdict_color = "green"
+
+    final_panel = f"""
+[bold]Rule Engine Verdict:[/bold] [{verdict_color}]{verdict_text}[/{verdict_color}]
+[bold]ML Engine Verdict:[/bold] {ml_verdict} ({ml_prob*100:.1f}%)
+    """
+    console.print(Panel(Text.from_markup(final_panel), title="[bold]Operation Summary[/bold]", border_style=verdict_color))
 
 if __name__ == "__main__":
-    print("Script started...")
-    try:
-        run_project()
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+    run_project()
