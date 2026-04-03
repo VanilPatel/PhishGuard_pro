@@ -123,12 +123,186 @@ def analyze_security(text, sender_email="", google_api_key=""):
     return combined_score, findings, urls, ml_pred, ml_conf
 
 # --- 2. THE UI DASHBOARD ---
-st.set_page_config(page_title="PhishGuard Pro", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="PhishGuard Enterprise", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
+
+# --- CUSTOM CSS FOR PROFESSIONAL UI ---
+st.markdown("""
+<style>
+    /* Main Background & Fonts */
+    .stApp {
+        background-color: #0E1117;
+        font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+    }
+    
+    /* Center the main app slightly for wide layout */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1400px;
+    }
+    
+    /* Headers & Titles */
+    h1, h2, h3, h4 {
+        color: #E2E8F0 !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.025em;
+    }
+    
+    /* Top Title Banner */
+    .title-container {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        padding: 2rem 2.5rem;
+        border-radius: 12px;
+        border: 1px solid rgba(51, 65, 85, 0.5);
+        margin-bottom: 2.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .main-title {
+        color: #38BDF8 !important;
+        font-size: 2.8rem !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    .sub-title {
+        color: #94A3B8 !important;
+        font-size: 1.15rem !important;
+        font-weight: 400 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Inputs and Text Areas */
+    div.stTextInput > div > div > input, 
+    div.stTextArea > div > div > textarea {
+        background-color: #1E293B !important;
+        color: #F8FAFC !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+    
+    div.stTextInput > div > div > input:focus, 
+    div.stTextArea > div > div > textarea:focus {
+        border-color: #0EA5E9 !important;
+        box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2) !important;
+    }
+    
+    /* Label text */
+    .stTextInput label, .stTextArea label, .stFileUploader label {
+        color: #CBD5E1 !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+    }
+
+    /* Primary Buttons */
+    .stButton > button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        padding: 0.6rem 1.2rem;
+        border: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Make the Run Scan Button pop */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #0284C7 0%, #2563EB 100%);
+        color: white;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    }
+    
+    .stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #0369A1 0%, #1D4ED8 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    /* Secondary Buttons (Reset, PDF) */
+    .stButton > button[kind="secondary"] {
+        background-color: #334155;
+        color: #F1F5F9;
+        border: 1px solid #475569;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background-color: #475569;
+        color: white;
+        border-color: #64748B;
+    }
+
+    /* Metrics Styling */
+    div[data-testid="stMetricValue"] {
+        font-size: 3rem !important;
+        font-weight: 700 !important;
+        color: #F8FAFC !important;
+        line-height: 1.2;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 1.1rem !important;
+        color: #94A3B8 !important;
+        font-weight: 500 !important;
+    }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: #0B1120;
+        border-right: 1px solid #1E293B;
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background-color: #1E293B !important;
+        border-radius: 8px !important;
+        color: #E2E8F0 !important;
+        font-weight: 500 !important;
+        border: 1px solid #334155 !important;
+    }
+    div[data-testid="stExpander"] {
+        border-color: transparent !important;
+    }
+    
+    /* Dividers */
+    hr {
+        border-color: #334155 !important;
+        margin: 2rem 0 !important;
+    }
+    
+    /* File Uploader Box */
+    [data-testid="stFileUploadDropzone"] {
+        background-color: rgba(30, 41, 59, 0.5) !important;
+        border: 2px dashed #475569 !important;
+        border-radius: 12px !important;
+    }
+    [data-testid="stFileUploadDropzone"]:hover {
+        border-color: #38BDF8 !important;
+        background-color: rgba(30, 41, 59, 0.8) !important;
+    }
+
+</style>
+""", unsafe_allow_html=True)
 
 
 # --- SUMMARY VERDICT AT TOP ---
-st.title("🛡️ PhishGuard Enterprise: Threat Remediation Engine")
-st.markdown("Automated Intelligence Platform for Digital Threat Eradication")
+st.markdown("""
+<div class="title-container">
+    <h1 class="main-title">🛡️ PhishGuard Enterprise</h1>
+    <h3 class="sub-title">Automated Intelligence Platform for Digital Threat Eradication</h3>
+</div>
+""", unsafe_allow_html=True)
 
 
 
@@ -264,13 +438,15 @@ with col1:
         st.session_state['email_input'] = email_input
     else:
         email_input = st.text_area("📄 Paste Raw Content:", value=st.session_state['email_input'], key='email_input', height=300, placeholder="Paste your log, email body, xml file, or code here...")
-    analyze_btn = st.button("🔍 Run Security Scan", key='analyze_btn')
     
-    def reset_form():
-        st.session_state['sender_input'] = ''
-        st.session_state['email_input'] = ''
-        
-    reset_btn = st.button("❌ Clear/Reset", key='reset_btn', on_click=reset_form)
+    cols_btn = st.columns([1,1])
+    with cols_btn[0]:
+        analyze_btn = st.button("🔍 RUN SECURITY SCAN", type="primary", key='analyze_btn')
+    with cols_btn[1]:
+        def reset_form():
+            st.session_state['sender_input'] = ''
+            st.session_state['email_input'] = ''
+        reset_btn = st.button("❌ Clear/Reset", key='reset_btn', type="secondary", on_click=reset_form)
 
 if analyze_btn:
     # --- Input validation ---
